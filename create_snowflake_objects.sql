@@ -71,3 +71,26 @@ CREATE OR REPLACE TABLE cortex_analyst_demo.revenue_timeseries.region_dim (
     sales_region VARCHAR(16777216),
     state VARCHAR(16777216)
 );
+use role accountadmin;
+
+-- create a Git API integration for Snowflake Labs
+-- This integration allows access to GitHub repositories under Snowflake-Labs
+-- It is used for accessing demo data and scripts from the Snowflake Labs GitHub organization
+CREATE OR REPLACE API INTEGRATION snowflake_labs_git_integration
+  API_PROVIDER = git_https_api
+  API_ALLOWED_PREFIXES = ('https://github.com/Snowflake-Labs/')
+  ENABLED = TRUE;
+
+USE ROLE cortex_user_role;
+-- Create a schema for Git repositories
+-- This schema will contain Git repositories for the Cortex Analyst demo
+CREATE OR REPLACE SCHEMA cortex_analyst_demo.git_repos;
+
+-- Create a Git repository for the Cortex Analyst demo
+-- This repository contains scripts and data for the Cortex Analyst demo
+CREATE OR REPLACE GIT REPOSITORY cortex_analyst_demo.git_repos.getting_started_with_cortex_analyst
+  API_INTEGRATION = snowflake_labs_git_integration
+  ORIGIN = 'https://github.com/Snowflake-Labs/sfguide-getting-started-with-cortex-analyst';
+
+-- Fetch the latest content from the Git repository
+ALTER GIT REPOSITORY cortex_analyst_demo.git_repos.getting_started_with_cortex_analyst FETCH;
