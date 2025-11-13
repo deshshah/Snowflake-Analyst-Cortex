@@ -7,8 +7,9 @@ USE ROLE SECURITYADMIN;
 CREATE ROLE IF NOT EXISTS cortex_user_role;
 GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE cortex_user_role;
 
--- TODO: Replace <your_user> with your username
-GRANT ROLE cortex_user_role TO USER <your_user>;
+-- Grant role to current user
+SET current_user = (SELECT CURRENT_USER());
+GRANT ROLE cortex_user_role TO USER IDENTIFIER($current_user);
 
 USE ROLE sysadmin;
 
