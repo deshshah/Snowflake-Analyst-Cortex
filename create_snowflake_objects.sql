@@ -34,14 +34,14 @@ GRANT OPERATE ON WAREHOUSE cortex_analyst_wh TO ROLE cortex_user_role;
 GRANT OWNERSHIP ON SCHEMA cortex_analyst_demo.revenue_timeseries TO ROLE cortex_user_role;
 GRANT OWNERSHIP ON DATABASE cortex_analyst_demo TO ROLE cortex_user_role;
 
+ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'AWS_US';
 
-USE ROLE cortex_user_role;
-
--- Use the created warehouse
+-- Use the created warehouse/database/schema/role.
 USE WAREHOUSE cortex_analyst_wh;
-
 USE DATABASE cortex_analyst_demo;
 USE SCHEMA cortex_analyst_demo.revenue_timeseries;
+USE ROLE cortex_user_role;
+
 
 -- Create stage for raw data
 CREATE OR REPLACE STAGE raw_data DIRECTORY = (ENABLE = TRUE);
@@ -73,10 +73,18 @@ CREATE OR REPLACE TABLE cortex_analyst_demo.revenue_timeseries.region_dim (
     state VARCHAR
 );
 
-select current_database(), current_role(), current_schema(), current_user();
-use role accountadmin;
+-- Create the search service.
+CREATE OR REPLACE CORTEX SEARCH SERVICE product_line_search_service
+  ON product_dimension
+  WAREHOUSE = cortex_analyst_wh
+  TARGET_LAG = '1 hour'
+  AS (
+      SELECT DISTINCT product_line AS product_dimension FROM product_dim
+  );
 
--- create a Git API integration for Snowflake Labs
+USE ROLE accountadmin;
+
+-- Create a Git API integration for Snowflake Labs
 -- This integration allows access to GitHub repositories under Snowflake-Labs
 -- It is used for accessing demo data and scripts from the Snowflake Labs GitHub organization
 CREATE OR REPLACE API INTEGRATION snowflake_labs_git_integration
@@ -128,38 +136,41 @@ COPY INTO daily_revenue
 FROM @raw_data
 FILES = ('data/daily_revenue.csv')
 FILE_FORMAT = demo_data_csv_format
-ON_ERROR = CONTINUE
+ON_ERROR = ABORT_STATEMENT
 FORCE = TRUE;
 
 COPY INTO product_dim
 FROM @raw_data
 FILES = ('data/product.csv')
 FILE_FORMAT = demo_data_csv_format
-ON_ERROR = CONTINUE
+ON_ERROR = ABORT_STATEMENT
 FORCE = TRUE;
 
 COPY INTO region_dim
 FROM @raw_data
 FILES = ('data/region.csv')
 FILE_FORMAT = demo_data_csv_format
-ON_ERROR = CONTINUE
+ON_ERROR = ABORT_STATEMENT
 FORCE = TRUE;
 
 /*--
 • Setup Validation
 --*/
 
-SELECT 'Table' as "TYPE", table_name AS created_object
+SELECT 'Table' as "TYPE", table_name AS created
 FROM cortex_analyst_demo.information_schema.tables
 WHERE table_schema = 'REVENUE_TIMESERIES'
 UNION ALL
-SELECT 'Git Repository', git_repository_name AS created
+SELECT 'Git Repository', git_repository_name
 FROM cortex_analyst_demo.information_schema.git_repositories
 WHERE git_repository_name = 'GETTING_STARTED_WITH_CORTEX_ANALYST'
 UNION ALL
-SELECT 'Revenue days', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.daily_revenue
+SELECT 'Search Service', service_name
+FROM cortex_analyst_demo.information_schema.cortex_search_services
 UNION ALL
-SELECT 'Products', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.product_dim
+SELECT 'Table rows: Revenue days', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.daily_revenue
 UNION ALL
-SELECT 'Regions', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.region_dim
-ORDER BY 2 DESC, 1;
+SELECT 'Table rows: Products', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.product_dim
+UNION ALL
+SELECT 'Table rows: Regions', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.region_dim
+ORDER BY 1, 2;
