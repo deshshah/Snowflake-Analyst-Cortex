@@ -63,15 +63,17 @@ CREATE OR REPLACE TABLE cortex_analyst_demo.revenue_timeseries.daily_revenue (
 -- Dimension table: product_dim
 CREATE OR REPLACE TABLE cortex_analyst_demo.revenue_timeseries.product_dim (
     product_id INT,
-    product_line VARCHAR(16777216)
+    product_line VARCHAR
 );
 
 -- Dimension table: region_dim
 CREATE OR REPLACE TABLE cortex_analyst_demo.revenue_timeseries.region_dim (
     region_id INT,
-    sales_region VARCHAR(16777216),
-    state VARCHAR(16777216)
+    sales_region VARCHAR,
+    state VARCHAR
 );
+
+select current_database(), current_role(), current_schema(), current_user();
 use role accountadmin;
 
 -- create a Git API integration for Snowflake Labs
@@ -87,11 +89,77 @@ USE ROLE cortex_user_role;
 -- This schema will contain Git repositories for the Cortex Analyst demo
 CREATE OR REPLACE SCHEMA cortex_analyst_demo.git_repos;
 
+USE SCHEMA git_repos;
+
 -- Create a Git repository for the Cortex Analyst demo
 -- This repository contains scripts and data for the Cortex Analyst demo
-CREATE OR REPLACE GIT REPOSITORY cortex_analyst_demo.git_repos.getting_started_with_cortex_analyst
+CREATE OR REPLACE GIT REPOSITORY getting_started_with_cortex_analyst
   API_INTEGRATION = snowflake_labs_git_integration
   ORIGIN = 'https://github.com/Snowflake-Labs/sfguide-getting-started-with-cortex-analyst';
 
 -- Fetch the latest content from the Git repository
-ALTER GIT REPOSITORY cortex_analyst_demo.git_repos.getting_started_with_cortex_analyst FETCH;
+ALTER GIT REPOSITORY getting_started_with_cortex_analyst FETCH;
+
+-- Copy that data from git into a staging area.
+COPY FILES INTO @cortex_analyst_demo.revenue_timeseries.raw_data
+FROM @getting_started_with_cortex_analyst/branches/main/revenue_timeseries.yaml;
+
+COPY FILES INTO @cortex_analyst_demo.revenue_timeseries.raw_data
+FROM @getting_started_with_cortex_analyst/branches/main/data;
+
+USE SCHEMA revenue_timeseries;
+
+-- Define the CSV file format.
+CREATE OR REPLACE FILE FORMAT demo_data_csv_format
+    TYPE = CSV
+    SKIP_HEADER = 1
+    FIELD_DELIMITER = ','
+    TRIM_SPACE = FALSE
+    FIELD_OPTIONALLY_ENCLOSED_BY = NONE
+    REPLACE_INVALID_CHARACTERS = TRUE
+    DATE_FORMAT = AUTO
+    TIME_FORMAT = AUTO
+    TIMESTAMP_FORMAT = AUTO
+    EMPTY_FIELD_AS_NULL = FALSE
+    ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE;
+
+-- Ingest the CSV data.
+COPY INTO daily_revenue
+FROM @raw_data
+FILES = ('data/daily_revenue.csv')
+FILE_FORMAT = demo_data_csv_format
+ON_ERROR = CONTINUE
+FORCE = TRUE;
+
+COPY INTO product_dim
+FROM @raw_data
+FILES = ('data/product.csv')
+FILE_FORMAT = demo_data_csv_format
+ON_ERROR = CONTINUE
+FORCE = TRUE;
+
+COPY INTO region_dim
+FROM @raw_data
+FILES = ('data/region.csv')
+FILE_FORMAT = demo_data_csv_format
+ON_ERROR = CONTINUE
+FORCE = TRUE;
+
+/*--
+• Setup Validation
+--*/
+
+SELECT 'Table' as "TYPE", table_name AS created_object
+FROM cortex_analyst_demo.information_schema.tables
+WHERE table_schema = 'REVENUE_TIMESERIES'
+UNION ALL
+SELECT 'Git Repository', git_repository_name AS created
+FROM cortex_analyst_demo.information_schema.git_repositories
+WHERE git_repository_name = 'GETTING_STARTED_WITH_CORTEX_ANALYST'
+UNION ALL
+SELECT 'Revenue days', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.daily_revenue
+UNION ALL
+SELECT 'Products', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.product_dim
+UNION ALL
+SELECT 'Regions', CAST(count(*) as STRING) FROM cortex_analyst_demo.revenue_timeseries.region_dim
+ORDER BY 2 DESC, 1;
