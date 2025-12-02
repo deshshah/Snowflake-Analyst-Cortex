@@ -82,11 +82,9 @@ def get_analyst_response(messages: List[Dict]) -> Tuple[Dict, Optional[str]]:
         if resp.status_code < 400:
             return parsed_content, None
         else:
-            
-    error_msg = f"""
-    🚨 Analyst API Error 🚨
-    * Status: `{resp.status_code}`
-    * Request ID: `{parsed_content.get('request_id')}`
-    * Error Code: `{parsed_content.get('error_code')}`
-    Message:
-
+            error_msg = f"""
+🚨 Analyst API Error 🚨
+* Status: `{resp.status_code}`
+* Request ID: `{parsed_content.get('request_id')}`
+* Error Code: `{parsed_content.get('error_code')}`
+Message:
