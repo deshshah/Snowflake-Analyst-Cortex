@@ -11,10 +11,11 @@ import snowflake.connector
 import sseclient
 import streamlit as st
 
-DATABASE = "<DB>"
-SCHEMA = "<SCHEMA>"
-STAGE = "<STAGE>"
-FILE = "<FILE>"
+HOST = "KEZQLYE-RNB41345.snowflakecomputing.com"
+DATABASE = "CORTEX_ANALYST_DEMO"
+SCHEMA = "REVENUE_TIMESERIES"
+STAGE = "RAW_DATA"
+FILE = "revenue_timeseries.yaml"
 
 if "CONN" not in st.session_state or st.session_state.CONN is None:
     # For troubleshooting your snowflake connection see https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect
