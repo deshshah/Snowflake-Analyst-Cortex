@@ -165,7 +165,6 @@ def process_message(prompt: str) -> None:
         {"role": "analyst", "content": accumulated_content}
     )
 
-
 def show_conversation_history() -> None:
     for message in st.session_state.messages:
         chat_role = "assistant" if message["role"] == "analyst" else "user"
